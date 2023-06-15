@@ -1,5 +1,5 @@
 ﻿# Skript zum erstellen bzw. Anpassen eine Neustarttasks
-# Stannek GmbH - Version 1.2 - 29.12.2022 ES
+# Stannek GmbH - Version 1.3 - 15.06.2023 ES
 
 # Diese Skript muss als Administrator ausgeführt werden, ansonsten wird es nicht gestartet
 #Requires -RunAsAdministrator
@@ -90,7 +90,6 @@ $mainForm.Controls.Add($okButton)
 # Skript abbrechen, wenn Fenster geschlossen wird
 If ($mainForm.DialogResult -eq "Cancel") {Break}
 
-
 # Datum und Uhrzeit aus Abfrage für Task aufbereiten
 $TaskDatetrigger = Get-Date -Date $datePicker.Value.Date -Hour $TimePicker.Value.TimeOfDay.Hours -Minute $TimePicker.Value.TimeOfDay.Minutes
 
@@ -98,7 +97,6 @@ $TaskDatetrigger = Get-Date -Date $datePicker.Value.Date -Hour $TimePicker.Value
 
 # TaskTrigger Zeit setzen
 $TaskTrigger = New-ScheduledTaskTrigger -At $TaskDatetrigger -Once
-
 
 If ((Get-ScheduledTask -TaskName $Taskname -ErrorAction SilentlyContinue).TaskName -eq $TaskName) 
     {# Setzt den neue Tasktrigger
@@ -112,3 +110,6 @@ Else
     $TaskPrincipal = New-ScheduledTaskPrincipal -UserId $(Get-WMIObject -class Win32_ComputerSystem | select UserName).username -RunLevel Highest -LogonType Interactive
     Register-ScheduledTask -Action $TaskAction -Trigger $TaskTrigger -Settings $TaskSettings -Principal $TaskPrincipal -TaskName $TaskName -Description "Führt einen Neustart des Computers zu einer festgelegten Zeit aus"
     }
+
+# Pruefe Task ob dieser deaktiviert ist
+If ((Get-ScheduledTask -TaskName $Taskname).State -eq "Disabled") {Enable-ScheduledTask -TaskName $TaskName}
