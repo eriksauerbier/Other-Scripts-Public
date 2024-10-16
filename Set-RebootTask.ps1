@@ -1,11 +1,12 @@
 ﻿# Skript zum erstellen bzw. Anpassen eine Neustarttasks
-# Stannek GmbH - Version 1.3 - 15.06.2023 ES
+# Stannek GmbH - Version 1.4 - 16.10.2024 ES
 
 # Diese Skript muss als Administrator ausgeführt werden, ansonsten wird es nicht gestartet
 #Requires -RunAsAdministrator
 
 # Parameter
 $TaskName = "einmaliger Neustart"
+$PathTask = "\Stannek GmbH"
 
 # Assemblys laden
 Add-Type -AssemblyName System.Windows.Forms
@@ -93,22 +94,30 @@ If ($mainForm.DialogResult -eq "Cancel") {Break}
 # Datum und Uhrzeit aus Abfrage für Task aufbereiten
 $TaskDatetrigger = Get-Date -Date $datePicker.Value.Date -Hour $TimePicker.Value.TimeOfDay.Hours -Minute $TimePicker.Value.TimeOfDay.Minutes
 
+# Erzeuge Task Einstellungen
+$TaskAction = New-ScheduledTaskAction -Execute "shutdown.exe" -Argument "/r /f /t 5"
+$TaskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit 00:15:00
+$TaskSettings.StartWhenAvailable = $false
+$TaskPrincipal = New-ScheduledTaskPrincipal -UserId $(Get-WMIObject -class Win32_ComputerSystem | select UserName).username -RunLevel Highest -LogonType Interactive
+$TaskUser = "NT Authority\SYSTEM"
+
 # Erstelle Task oder passe vorhanden Task an
 
 # TaskTrigger Zeit setzen
 $TaskTrigger = New-ScheduledTaskTrigger -At $TaskDatetrigger -Once
 
-If ((Get-ScheduledTask -TaskName $Taskname -ErrorAction SilentlyContinue).TaskName -eq $TaskName) 
+If (($(Get-ScheduledTask -TaskName $Taskname -ErrorAction SilentlyContinue).TaskName -eq $TaskName) -and ($(Get-ScheduledTask -TaskName $Taskname -ErrorAction SilentlyContinue).TaskPath -ne "\"))
     {# Setzt den neue Tasktrigger
-    Set-ScheduledTask -TaskName $Taskname -Trigger $TaskTrigger
+    Set-ScheduledTask -TaskPath $PathTask -TaskName $Taskname -Trigger $TaskTrigger
     }
+ElseIf ((Get-ScheduledTask -TaskName $Taskname -ErrorAction SilentlyContinue).TaskPath -eq "\") {
+        # Entfernt den alten Task und erstellt einen neuen Task
+        Get-ScheduledTask -TaskName $Taskname | Unregister-ScheduledTask -Confirm:$false
+        Register-ScheduledTask -Action $TaskAction -Trigger $TaskTrigger -TaskPath $PathTask -Settings $TaskSettings -User $TaskUser -TaskName $TaskName -Description "Führt einen Neustart des Computers zu einer festgelegten Zeit aus"
+        }
 Else
     {# Erstellt Neustart Task, da keiner vorhanden ist
-    $TaskAction = New-ScheduledTaskAction -Execute "shutdown.exe" -Argument "/r /f /t 5"
-    $TaskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit 00:15:00
-    $TaskSettings.StartWhenAvailable = $false
-    $TaskPrincipal = New-ScheduledTaskPrincipal -UserId $(Get-WMIObject -class Win32_ComputerSystem | select UserName).username -RunLevel Highest -LogonType Interactive
-    Register-ScheduledTask -Action $TaskAction -Trigger $TaskTrigger -Settings $TaskSettings -Principal $TaskPrincipal -TaskName $TaskName -Description "Führt einen Neustart des Computers zu einer festgelegten Zeit aus"
+    Register-ScheduledTask -Action $TaskAction -Trigger $TaskTrigger -TaskPath $PathTask -Settings $TaskSettings -User $TaskUser -TaskName $TaskName -Description "Führt einen Neustart des Computers zu einer festgelegten Zeit aus"
     }
 
 # Pruefe Task ob dieser deaktiviert ist
